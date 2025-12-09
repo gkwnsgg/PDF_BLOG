@@ -1,0 +1,4 @@
+pymupdf
+Pillow
+pytest
+numpy
