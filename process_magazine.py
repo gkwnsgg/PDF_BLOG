@@ -14,7 +14,10 @@ def main():
 
     pdf_path = Path(args.pdf_path)
     output_dir = Path(args.output)
-    output_dir.mkdir(exist_ok=True)
+
+    # Create subdirectories
+    (output_dir / "images").mkdir(parents=True, exist_ok=True)
+    (output_dir / "articles").mkdir(parents=True, exist_ok=True)
 
     print(f"Processing {pdf_path}...")
 
@@ -26,22 +29,13 @@ def main():
 
     classifier = PageClassifier()
     extractor = ContentExtractor(str(output_dir))
-    uploader = WordPressUploader(str(output_dir))
+    # uploader = WordPressUploader(str(output_dir)) # Disabled for now, focusing on extraction
 
     for page_num, page in enumerate(doc):
         real_page_num = page_num + 1
         print(f"Analyzing Page {real_page_num}...")
 
-        # Split page into halves (Left/Right)
-        # Note: Some pages might be single pages (Covers), but for now we assume spreads as per req.
-        # Ideally we should detect spread vs single.
-        # For this prototype, we'll try to treat the whole page first,
-        # but the requirement says "Mostly 2-page spreads".
-        # Let's split unconditionally for now, as typical magazine PDFs are spreads.
-        # But wait, if it's a cover, it might be single.
-        # Let's check aspect ratio?
-        # A spread is usually wider than tall. A single page is taller than wide.
-
+        # Check aspect ratio to determine if spread or single
         is_spread = page.rect.width > page.rect.height
 
         regions = []
@@ -52,40 +46,27 @@ def main():
         else:
             regions.append(('Single', page.rect))
 
-        page_content = []
+        page_markdown = []
 
         for side, rect in regions:
             classification = classifier.classify_region(page, rect)
             print(f"  [{side}] Type: {classification['type']} ({classification['reason']})")
 
+            # White List Logic: Only process 'article' types
             if classification['type'] == 'article':
-                # Extract content
-                md = extractor.extract_content(page, rect, real_page_num)
-                if md.strip():
-                    page_content.append(md)
+                content = extractor.extract_content(page, rect, real_page_num)
+                if content.strip():
+                     page_markdown.append(f"### Page {real_page_num} ({side})\n\n{content}")
 
-            elif classification['type'] == 'article_image':
-                # It's an article page but mostly image/decorative.
-                # We should probably extract the image.
-                # For now, let's treat it as article to capture the image.
-                 md = extractor.extract_content(page, rect, real_page_num)
-                 if md.strip():
-                    page_content.append(md)
+        if page_markdown:
+            full_text = "\n\n---\n\n".join(page_markdown)
 
-        if page_content:
-            full_text = "\n\n---\n\n".join(page_content)
-            # Create a post for this page (or append to a running article?)
-            # The requirement implies extracting "Articles".
-            # An article might span multiple pages.
-            # However, for this MVP, let's upload per-page-spread chunks
-            # or we need a way to group them.
-            # Given the complexity of multi-page grouping without Title matching,
-            # we will output per-page content for now.
+            # Save to Markdown file
+            md_filename = f"article_p{real_page_num:03d}.md"
+            with open(output_dir / "articles" / md_filename, "w", encoding="utf-8") as f:
+                f.write(full_text)
 
-            title = f"Extracted Content - Page {real_page_num}"
-            # Try to find a real title in the content? (First bold line?)
-
-            uploader.upload_post(title, full_text)
+            print(f"  -> Extracted to {md_filename}")
 
     print("Done.")
 
