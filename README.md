@@ -18,3 +18,25 @@ This project extracts specific "Article" content from magazine PDFs and uploads 
 - Pillow
 - pandas
 - numpy
+
+## Usage
+The refactored extraction logic is available via `process_magazine.py`.
+
+```bash
+python3 process_magazine.py <path_to_pdf> --output <output_directory>
+```
+
+Example:
+```bash
+python3 process_magazine.py magazine.pdf --output my_blog_content
+```
+
+This will create:
+- `my_blog_content/articles/`: Extracted text (Markdown).
+- `my_blog_content/images/`: Extracted images.
+
+### Key Features
+- **Ad Exclusion**: Automatically filters out pages without watermarks/page numbers.
+- **Reading Order**: Reconstructs Left-to-Right columns from scrambled PDF text.
+- **Text-Over-Image**: Extracts background images separately from text overlays.
+- **Mixed Language**: Handles both English and Korean content.
